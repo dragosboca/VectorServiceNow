@@ -1,32 +1,138 @@
 "use strict";
+// trigger the debugger so that you can easily set breakpoints
+//debugger;
 
-var VectorWatch = require('vectorwatch-browser');
-var request = require('request');
-var Schedule = require('node-schedule');
+var VectorWatch = require('vectorwatch-sdk');
 var StorageProvider = require('vectorwatch-storageprovider');
+var Schedule = require('node-schedule');
+var request = require('request');
+
 
 var vectorWatch = new VectorWatch();
+var logger = vectorWatch.logger;
 var storageProvider = new StorageProvider();
+
 vectorWatch.setStorageProvider(storageProvider);
 
-var logger = vectorWatch.logger;
+function run_query(machine, user, password) {
+    var limit = 10;
+    var url = 'https://' + user + ':' + password + '@' + machine + "/api/now/table/sysapproval_approver?sysparm_exclude_reference_link=true&sysparm_fields=state%2Cdue_date&sysparm_limit=" + limit;
+    //var url = 'https://' + machine + "/api/now/table/sysapproval_approver?sysparm_exclude_reference_link=true&sysparm_fields=state%2Cdue_date&sysparm_limit=" + limit;
 
-var hours = ['twelve', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven'];
-var minutes = ['', 'five', 'ten', 'quarter', 'twenty', 'twenty five', 'half'];
+    return new Promise(function(resolve, reject) {
+        request.get(url,
+            function(error, httpResponse, body) {
+                if (error) {
+                    reject('REST call error: ' + error.message + ' for ' + url);
+                    return;
+                }
+
+                if (httpResponse && httpResponse.statusCode != 200) {
+                    reject('REST call error: ' + httpResponse.statusCode + ' for ' + url);
+                    return;
+                }
+
+                try {
+                    body = JSON.parse(body);
+                    resolve(body);
+                } catch (err) {
+                    reject('Malformed JSON response from ' + url + ': ' + err.message);
+                }
+
+            });
+    });
+}
 
 vectorWatch.on('config', function(event, response) {
     // your stream was just dragged onto a watch face
     logger.info('on config');
+    var machine = response.createAutocomplete('machine');
+    machine.setHint('ServiceNow instance (excluding https://)');
+    machine.setDynamic(true);
+    machine.setAsYouType(1);
+
+    var user = response.createAutocomplete('user');
+    user.setHint('User name for ServiceNow instance');
+    user.setDynamic(true);
+    user.setAsYouType(1);
+
+    var password = response.createAutocomplete('password');
+    password.setHint('Password for ServicceNow instance');
+    password.setDynamic(true);
+    password.setAsYouType(1);
+
     response.send();
 });
 
+vectorWatch.on('options', function(event, response) {
+    // dynamic options for a specific setting name was requested
+    var settingName = event.getSettingName();
+    var searchTerm = event.getSearchTerm();
+
+    switch (settingName) {
+        case 'machine':
+        case 'user':
+        case 'password':
+            response.addOption(searchTerm.substring(0, 60));
+            response.send();
+            break;
+        default:
+            logger.error("Invalid setting name: " + settingName);
+            response.addOption('APPLICATION ERROR');
+            response.send();
+    }
+});
+
+function getStreamText(resp) {
+    return 'A: ' + resp.length;
+    /** result example
+{
+  "result": [
+    {
+      "due_date": "2016-11-22 12:43:39",
+      "state": "approved"
+    }
+  ]
+}
+**/
+
+}
+
 vectorWatch.on('subscribe', function(event, response) {
     // your stream was added to a watch face
-    var time = getCurrentTime();  
-    logger.info('on subscribe', time); 
+    logger.info('on subscribe');
 
-    response.setValue(time);
-    response.send();
+    var machine;
+    var user;
+    var password;
+
+    //get configuration option
+    try {
+        machine = event.getUserSettings().settings['machine'].name;
+        user = event.getUserSettings().settings['user'].name;
+        password = event.getUserSettings().settings['password'].name;
+    } catch (err) {
+        logger.error('on subscribe - malformed user setting: ' + err.message);
+        response.setValue('SERVER ERROR');
+        response.send();
+    }
+
+    //run first query
+    try {
+        run_query(machine, user, password).then(function(body) {
+            var res = (getStreamText(body.result));
+            response.setValue(res);
+            response.send();
+        }).catch(function(e) {
+            logger.error(e);
+            response.setValue('AUTH ERROR');
+            response.send();
+        });
+    } catch (err) {
+        logger.error('invalid response from ServiceNow instance: ' + machine);
+        response.setValue('RESPONSE ERROR');
+        response.send();
+    }
 });
 
 vectorWatch.on('unsubscribe', function(event, response) {
@@ -35,64 +141,28 @@ vectorWatch.on('unsubscribe', function(event, response) {
     response.send();
 });
 
-vectorWatch.on('webhook', function (event, response) {
-    logger.info('Webhook!');
-    response.send();
-});
-
-function getCurrentTime() {
-    var date = new Date();
-    var hour = date.getHours()%12;
-    var minute = Math.round(date.getMinutes()/5);
-    if (minute == 12) {
-        minute = 0;
-        hour = (hour+1)%12;
-    }
-    var time;
-    
-    if (minute === 0) {
-        time = hours[hour] + " o'clock";
-    } else if (minute <= 6) {
-        time = minutes[minute] + ' past ' + hours[hour];
-    } else{
-        time = minutes[12-minute] + ' to ' + hours[(hour+1)%12];
-    }
-
-    return time;
-}
-
 function pushUpdates() {
-    
     storageProvider.getAllUserSettingsAsync().then(function(records) {
-        var streamText = getCurrentTime();
-        logger.info('Pushing updates to ' + records.length + ' users', streamText);
-
-	records.forEach(function(record) {
-	    // record.userSettings
-            vectorWatch.pushStreamValue(record.channelLabel, streamText);
-	});
+        records.forEach(function(record) {
+            var settings = record.userSettings;
+            try {
+                run_query(settings.Machine.name, settings.User.name, settings.Password.name).then(function(body) {
+                    var streamText = getStreamText(body.query.results.rate.Rate);
+                    vectorWatch.pushStreamValue(record.channelLabel, streamText);
+                }).catch(function(e) {
+                    logger.error(e);
+                });
+            } catch (err) {
+                logger.error('on push - malformed user setting: ' + err.message);
+            }
+        });
     });
-}
-
-function keepAlive() {
-    //A request to Vector server on the webhook endpoint will trigger an outside request for the current application
-    var url = 'https://endpoint.vector.watch/VectorCloud/rest/v1/stream/'+process.env.STREAM_UUID+'/webhook';
-    request(url);
 }
 
 function scheduleJob() {
     var scheduleRule = new Schedule.RecurrenceRule();
-    var times = [];
-    for (var i=0;i<60;i+=5) {
-        times.push(i);
-    }
-    scheduleRule.minute = times; // will execute every 5 minutes
+    scheduleRule.minute = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 0]; // will execute at :15 and :45 every hour
     Schedule.scheduleJob(scheduleRule, pushUpdates);
-
-    // Custom rule in order to keep the heroku server alive.
-    var scheduleRuleHeroku = new Schedule.RecurrenceRule();
-    scheduleRuleHeroku.minute = [0,30];
-    Schedule.scheduleJob(scheduleRuleHeroku, keepAlive);
 }
 
 vectorWatch.createServer(scheduleJob);
