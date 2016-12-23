@@ -154,7 +154,7 @@ function pushUpdates() {
         records.forEach(function(record) {
             var settings = record.userSettings;
             try {
-                run_query(settings.Machine.name, settings.User.name, settings.Password.name).then(function(body) {
+                run_query(settings.machine.name, settings.user.name, settings.password.name).then(function(body) {
                     var streamText = getStreamText(body.query.results.rate.Rate);
                     vectorWatch.pushStreamValue(record.channelLabel, streamText);
                 }).catch(function(e) {
