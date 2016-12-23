@@ -14,7 +14,7 @@
     "vectorwatch-stream"
   ],
   "author": "Dragos Boca <dragos.boca@zero-b.ro>",
-  "license": "Copyright (C) 2016 Dragos Boca",
+  "license": "MIT",
   "repository": {
       "type": "git",
       "url": "https://github.com/dragosboca/VectorServiceNow.git"
