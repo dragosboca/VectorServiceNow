@@ -28,11 +28,13 @@ function run_query(machine, user, password) {
             },
             function(error, httpResponse, body) {
                 if (error) {
+                    logger.error('REST call error:' + error.message);
                     reject('REST call error: ' + error.message + ' for ' + url);
                     return;
                 }
 
                 if (httpResponse && httpResponse.statusCode != 200) {
+                    logger.error('REST call error: ' + httpResponse.statusCode + ' for ' + url);
                     reject('REST call error: ' + httpResponse.statusCode + ' for ' + url);
                     return;
                 }
@@ -41,6 +43,7 @@ function run_query(machine, user, password) {
                     body = JSON.parse(body);
                     resolve(body);
                 } catch (err) {
+                    logger.error('Malformed JSON response from ' + url + ': ' + err.message);
                     reject('Malformed JSON response from ' + url + ': ' + err.message);
                 }
 
@@ -166,7 +169,7 @@ function pushUpdates() {
 
 function scheduleJob() {
     var scheduleRule = new Schedule.RecurrenceRule();
-    scheduleRule.minute = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 0]; // will execute at :15 and :45 every hour
+    scheduleRule.minute = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 0];
     Schedule.scheduleJob(scheduleRule, pushUpdates);
 }
 
