@@ -28,7 +28,7 @@ function run_query(machine, user, password) {
             },
             function(error, httpResponse, body) {
                 if (error) {
-                    logger.error('REST call error:' + error.message);
+                    logger.error('REST call error: ' + error.message + ' for ' + url);
                     reject('REST call error: ' + error.message + ' for ' + url);
                     return;
                 }
