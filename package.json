@@ -1,0 +1,30 @@
+{
+  "name": "VectorServiceNow",
+  "version": "0.0.1",
+  "scripts": {
+    "start": "node index.js",
+    "test": ""
+  },
+  "description": "A vectorwatch stream that read ServiceNow informations.",
+  "main": "index.js",
+  "keywords": [
+    "vectorwatch",
+    "vectorwatch-browser",
+    "hello-heroku",
+    "vectorwatch-stream"
+  ],
+  "author": "Dragos Boca <dragos.boca@zero-b.ro>",
+  "license": "Copyright (C) 2016 Dragos Boca",
+  "repository": {
+      "type": "git",
+      "url": "https://github.com/dragosboca/VectorServiceNow.git"
+  },
+  "dependencies": {
+      "vectorwatch-browser": "^1.3.0",
+    "node-schedule": "^1.1.0",
+    "vectorwatch-storageprovider": "^1.0.0",
+    "vectorwatch-authprovider-oauth2": "^1.0.0",
+    "vectorwatch-authprovider-oauth1": "^1.0.0",
+    "request": "^2.72.0"
+  }
+}
