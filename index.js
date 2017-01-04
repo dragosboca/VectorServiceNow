@@ -1,12 +1,10 @@
 "use strict";
-// trigger the debugger so that you can easily set breakpoints
 //debugger;
 
 var VectorWatch = require('vectorwatch-sdk');
 var StorageProvider = require('vectorwatch-storageprovider');
 var Schedule = require('node-schedule');
 var request = require('request');
-
 
 var vectorWatch = new VectorWatch();
 var logger = vectorWatch.logger;
@@ -16,6 +14,8 @@ vectorWatch.setStorageProvider(storageProvider);
 
 function run_query(machine, user, password) {
     var limit = 10;
+    //TODO:10 refine search or use count
+    //TODO:5 Add more searches
     var url = 'https://' + machine + "/api/now/table/sysapproval_approver?sysparm_exclude_reference_link=true&sysparm_fields=state%2Cdue_date&sysparm_limit=" + limit;
 
     return new Promise(function(resolve, reject) {
@@ -52,7 +52,6 @@ function run_query(machine, user, password) {
 }
 
 vectorWatch.on('config', function(event, response) {
-    // your stream was just dragged onto a watch face
     logger.info('on config');
     var machine = response.createAutocomplete('machine');
     machine.setHint('ServiceNow instance (excluding https://)');
@@ -73,7 +72,6 @@ vectorWatch.on('config', function(event, response) {
 });
 
 vectorWatch.on('options', function(event, response) {
-    // dynamic options for a specific setting name was requested
     var settingName = event.getSettingName();
     var searchTerm = event.getSearchTerm();
 
@@ -107,7 +105,6 @@ function getStreamText(resp) {
 }
 
 vectorWatch.on('subscribe', function(event, response) {
-    // your stream was added to a watch face
     logger.info('on subscribe');
 
     var machine;
@@ -144,7 +141,6 @@ vectorWatch.on('subscribe', function(event, response) {
 });
 
 vectorWatch.on('unsubscribe', function(event, response) {
-    // your stream was removed from a watch face
     logger.info('on unsubscribe');
     response.send();
 });
